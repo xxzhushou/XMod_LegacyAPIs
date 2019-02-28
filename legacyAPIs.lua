@@ -555,7 +555,7 @@ function unlockDevice()
 end
 
 function deviceIsLock()
-    return device.isLock()
+    return device.isLock() and 1 or 0
 end
 
 function resetIDLETimer()
