@@ -5,6 +5,8 @@
 
 local bit = require('bit32')
 
+-- 可能频繁调用的模块/函数, 用local加速下访问速度
+local io = io
 local os = os
 local UI = UI
 local xmod = xmod
@@ -22,6 +24,9 @@ local Rect = Rect
 local Point = Point
 local Image = Image
 
+local log = log
+local sleep = sleep
+
 local os_netTime = os.netTime
 local os_milliTime = os.milliTime
 
@@ -35,8 +40,8 @@ local touch_up = touch.up
 
 local screen_keep = screen.keep
 local screen_getSize = screen.getSize
-local screen_getRGB = screen.getRGB
-local screen_getColor = screen.getColor
+local screen_getColorRGB = screen.getColorRGB
+local screen_getColorHex = screen.getColorHex
 local screen_findImage = screen.findImage
 local screen_matchColor = screen.matchColor
 local screen_matchColors = screen.matchColors
@@ -46,41 +51,6 @@ local screen_findColors = screen.findColors
 local storage_get = storage.get
 local storage_put = storage.put
 local storage_commit = storage.commit
-
--- (legacy) hook io函数，桥接[private]/[public]访问目录
-local __old_open__ = io.open
-io.open = function(name, mode)
-    if type(name) == 'string' then
-        name = xmod_resolvePath(name)
-    end
-    return __old_open__(name, mode)
-end
-
-local __old_lines__ = io.lines
-io.lines = function(name)
-    if type(name) == 'string' then
-        name = xmod_resolvePath(name)
-    end
-    return __old_lines__(name)
-end
-
-local __old_input__ = io.input
-io.input = function(...)
-    local arg = { ... }
-    if #arg > 0 and type(arg[1]) == 'string' then
-        arg[1] = xmod_resolvePath(arg[1])
-    end
-    return __old_input__(unpack(arg))
-end
-
-local __old_output__ = io.output
-io.output = function(...)
-    local arg = { ... }
-    if #arg > 0 and type(arg[1]) == 'string' then
-        arg[1] = xmod_resolvePath(arg[1])
-    end
-    return __old_output__(unpack(arg))
-end
 
 local function ori2dir(ori)
     local dir = 0
@@ -133,131 +103,189 @@ local function keyname2code(name)
     return code
 end
 
-function sysLog(msg)
+-- (legacy) hook io函数，桥接[private]/[public]访问目录
+local __orig_io_open__ = io.open
+local function __hook_io_open(name, mode)
+    if type(name) == 'string' then
+        name = xmod_resolvePath(name)
+    end
+    return __orig_io_open__(name, mode)
+end
+rawset(io, 'open', __hook_io_open)
+
+local __orig_io_lines__ = io.lines
+local function __hook_io_lines(name)
+    if type(name) == 'string' then
+        name = xmod_resolvePath(name)
+    end
+    return __orig_io_lines__(name)
+end
+rawset(io, 'lines', __hook_io_lines)
+
+local __orig_io_input__ = io.input
+local function __hook_io_input(...)
+    local arg = { ... }
+    if #arg > 0 and type(arg[1]) == 'string' then
+        arg[1] = xmod_resolvePath(arg[1])
+    end
+    return __orig_io_input__(unpack(arg))
+end
+rawset(io, 'input', __hook_io_input)
+
+local __orig_io_output__ = io.output
+local function __hook_io_output(...)
+    local arg = { ... }
+    if #arg > 0 and type(arg[1]) == 'string' then
+        arg[1] = xmod_resolvePath(arg[1])
+    end
+    return __orig_io_output__(unpack(arg))
+end
+rawset(io, 'output', __hook_io_output)
+
+local function __tengine_sysLog(msg)
     log(msg)
 end
+rawset(_G, 'sysLog', __tengine_sysLog)
 
-function fileLogWrite(name, date_flag, tag, msg)
+local function __tengine_fileLogWrite(name, date_flag, tag, msg)
     log(msg)
 end
+rawset(_G, 'fileLogWrite', __tengine_fileLogWrite)
 
-function mSleep(ms)
+local function __tengine_mSleep(ms)
     sleep(ms)
 end
+rawset(_G, 'mSleep', __tengine_mSleep)
 
-function mTime()
+local function __tengine_mTime()
     return os_milliTime()
 end
+rawset(_G, 'mTime', __tengine_mTime)
 
-function getNetTime()
+local function __tengine_getNetTime()
     return os_netTime()
 end
+rawset(_G, 'getNetTime', __tengine_getNetTime)
 
-function getOSType()
+local function __tengine_getOSType()
     if xmod.PLATFORM == xmod.PLATFORM_ANDROID then
         return 'android'
     else
         return 'iOS'
     end
 end
+rawset(_G, 'getOSType', __tengine_getOSType)
 
-function getEngineVersion()
+local function __tengine_getEngineVersion()
     return xmod.VERSION_NAME
 end
+rawset(_G, 'getEngineVersion', __tengine_getEngineVersion)
 
-function isPrivateMode()
-    return xmod.PRODUCT_CODE == xmod.PRODUCT_CODE_IPA or
-           xmod.PRODUCT_CODE == xmod.PRODUCT_CODE_KUWAN
+local function __tengine_isPrivateMode()
+    return xmod.PROCESS_MODE == xmod.PROCESS_MODE_STANDALONE and 1 or 0
 end
+rawset(_G, 'isPrivateMode', __tengine_isPrivateMode)
+rawset(_G, 'isPriviateMode', __tengine_isPrivateMode) -- typo compaitable
 
--- typo compaitable
-function isPriviateMode()
-    return isPrivateMode()
-end
-
-function lua_exit()
+local function __tengine_lua_exit()
     xmod.exit()
 end
+rawset(_G, 'lua_exit', __tengine_lua_exit)
 
-function lua_restart()
+local function __tengine_lua_restart()
     xmod.restart()
 end
+rawset(_G, 'lua_restart', __tengine_lua_restart)
 
-function setSysConfig(key, value)
+local function __tengine_setSysConfig(key, value)
     if key == screen.SCREENCAP_POLICY then
         value = (value == 'aggressive') and screen.SCREENCAP_POLICY_AGGRESSIVE or screen.SCREENCAP_POLICY_STANDARD
     end
     xmod_setConfig(key, value)
 end
+rawset(_G, 'setSysConfig', __tengine_setSysConfig)
 
-function setTimer(time, callback, ...)
+local function __tengine_setTimer(time, callback, ...)
     local args = { ... }
     return task.execTimer(time, callback, unpack(args))
 end
+rawset(_G, 'setTimer', __tengine_setTimer)
 
-function asyncExec(arguments)
+local function __tengine_asyncExec(arguments)
     local args = { arguments, arguments.callback }
     if arguments.content then
         table.insert(args, arguments.content)
     end
     return task.execAsync(unpack(args))
 end
+rawset(_G, 'asyncExec', __tengine_asyncExec)
 
-function setStringConfig(key, value)
+local function __tengine_setStringConfig(key, value)
     storage_put(key, value)
     storage_commit()
 end
+rawset(_G, 'setStringConfig', __tengine_setStringConfig)
 
-function getStringConfig(key, defVal)
+local function __tengine_getStringConfig(key, defVal)
     return storage_get(key, defVal)
 end
+rawset(_G, 'getStringConfig', __tengine_getStringConfig)
 
-function setNumberConfig(key, value)
+local function __tengine_setNumberConfig(key, value)
     storage_put(key, value)
     storage_commit()
 end
+rawset(_G, 'setNumberConfig', __tengine_setNumberConfig)
 
-function getNumberConfig(key, defVal)
+local function __tengine_getNumberConfig(key, defVal)
     return tonumber(storage_get(key, defVal)) or defVal
 end
+rawset(_G, 'getNumberConfig', __tengine_getNumberConfig)
 
-function getUserID()
+local function __tengine_getUserID()
     local user_info, code = script.getUserInfo()
     return user_info.id, code
 end
+rawset(_G, 'getUserID', __tengine_getUserID)
 
-function getUserCredit()
+local function __tengine_getUserCredit()
     local user_info, code = script.getUserInfo()
     return user_info.membership, user_info.expiredTime, code
 end
+rawset(_G, 'getUserCredit', __tengine_getUserCredit)
 
-function getScriptID()
+local function __tengine_getScriptID()
     local script_info, code = script.getScriptInfo()
     return script_info.id, code
 end
+rawset(_G, 'getScriptID', __tengine_getScriptID)
 
-function getCloudContent(key, token, defMsg)
+local function __tengine_getCloudContent(key, token, defMsg)
     local msg, code = script.getBulletinBoard(key, token)
     if code ~= 0 then
         msg = defMsg
     end
     return msg, code
 end
+rawset(_G, 'getCloudContent', __tengine_getCloudContent)
 
-function getUIContent(src)
+local function __tengine_getUIContent(src)
     return script.getUIData(src)
 end
+rawset(_G, 'getUIContent', __tengine_getUIContent)
 
-function init(appID, dir)
+local function __tengine_init(appID, dir)
     screen.init(dir2ori(dir))
 end
+rawset(_G, 'init', __tengine_init)
 
-function findImageInRegionFuzzy(picpath, degree, x1, y1, x2, y2, alpha)
+local function __tengine_findImageInRegionFuzzy(picpath, degree, x1, y1, x2, y2, alpha)
     local pos = screen_findImage(block2rect({ x1, y1, x2, y2 }), picpath, degree, screen.PRIORITY_DEFAULT, alpha)
     return pos.x, pos.y
 end
+rawset(_G, 'findImageInRegionFuzzy', __tengine_findImageInRegionFuzzy)
 
-function findColor(block, color, degree, hdir, vdir, priority)
+local function __tengine_findColor(block, color, degree, hdir, vdir, priority)
     if type(color) == 'table' then
         local ct = {}
         for _, v in ipairs(color) do
@@ -268,8 +296,9 @@ function findColor(block, color, degree, hdir, vdir, priority)
     local pos = screen_findColor(block2rect(block), color, degree, searchdir2priority(hdir or 0, vdir or 0, priority or 0))
     return pos.x, pos.y
 end
+rawset(_G, 'findColor', __tengine_findColor)
 
-function findColors(block, color, degree, hdir, vdir, priority)
+local function __tengine_findColors(block, color, degree, hdir, vdir, priority)
     if type(color) == 'table' then
         local ct = {}
         for _, v in ipairs(color) do
@@ -284,52 +313,62 @@ function findColors(block, color, degree, hdir, vdir, priority)
     end
     return result
 end
+rawset(_G, 'findColors', __tengine_findColors)
 
-function findColorInRegionFuzzy(tcolor, degree, x1, y1, x2, y2, hdir, vdir)
-    return findColor({ x1, y1, x2, y2 }, tcolor, degree, hdir or 0, vdir or 0)
+local function __tengine_findColorInRegionFuzzy(tcolor, degree, x1, y1, x2, y2, hdir, vdir)
+    return __tengine_findColor({ x1, y1, x2, y2 }, tcolor, degree, hdir or 0, vdir or 0)
 end
+rawset(_G, 'findColorInRegionFuzzy', __tengine_findColorInRegionFuzzy)
 
-function findMultiColorInRegionFuzzy(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
+local function __tengine_findMultiColorInRegionFuzzy(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
     local color = string.format('0|0|0x%06x,%s', tcolor, posandcolors)
-    return findColor({ x1, y1, x2, y2 }, color, degree, hdir or 0, vdir or 0)
+    return __tengine_findColor({ x1, y1, x2, y2 }, color, degree, hdir or 0, vdir or 0)
 end
+rawset(_G, 'findMultiColorInRegionFuzzy', __tengine_findMultiColorInRegionFuzzy)
 
-function findMultiColorInRegionFuzzy2(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
+local function __tengine_findMultiColorInRegionFuzzy2(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
     table.insert(posandcolors, 1, { x = 0, y = 0, color = tcolor })
-    return findColor({ x1, y1, x2, y2 }, posandcolors, degree, hdir or 0, vdir or 0)
+    return __tengine_findColor({ x1, y1, x2, y2 }, posandcolors, degree, hdir or 0, vdir or 0)
 end
+rawset(_G, 'findMultiColorInRegionFuzzy2', __tengine_findMultiColorInRegionFuzzy2)
 
-function findMultiColorInRegionFuzzyExt(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
+local function __tengine_findMultiColorInRegionFuzzyExt(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
     local color = string.format('0|0|0x%06x,%s', tcolor, posandcolors)
-    return findColors({ x1, y1, x2, y2 }, color, degree, hdir or 0, vdir or 0)
+    return __tengine_findColors({ x1, y1, x2, y2 }, color, degree, hdir or 0, vdir or 0)
 end
+rawset(_G, 'findMultiColorInRegionFuzzyExt', __tengine_findMultiColorInRegionFuzzyExt)
 
-function findMultiColorInRegionFuzzyExt2(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
+local function __tengine_findMultiColorInRegionFuzzyExt2(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
     table.insert(posandcolors, 1, { x = 0, y = 0, color = tcolor })
-    return findColors({ x1, y1, x2, y2 }, posandcolors, degree, hdir or 0, vdir or 0)
+    return __tengine_findColors({ x1, y1, x2, y2 }, posandcolors, degree, hdir or 0, vdir or 0)
 end
+rawset(_G, 'findMultiColorInRegionFuzzyExt2', __tengine_findMultiColorInRegionFuzzyExt2)
 
-function getColor(x, y)
-    return screen_getColor(x, y):toInt()
+local function __tengine_getColor(x, y)
+    return screen_getColorHex(x, y)
 end
+rawset(_G, 'getColor', __tengine_getColor)
 
-function getColorRGB(x, y)
-    return screen_getRGB(x, y)
+local function __tengine_getColorRGB(x, y)
+    return screen_getColorRGB(x, y)
 end
+rawset(_G, 'getColorRGB', __tengine_getColorRGB)
 
-function keepScreen(enabled)
+local function __tengine_keepScreen(enabled)
     screen_keep(enabled)
 end
+rawset(_G, 'keepScreen', __tengine_keepScreen)
 
-function snapshot(picname, x1, y1, x2, y2, quality)
+local function __tengine_snapshot(picname, x1, y1, x2, y2, quality)
     local rect = { 0, 0, 0, 0 }
     if y2 ~= nil then
         rect = block2rect({ x1, y1, x2, y2 })
     end
     return screen.snapshot(picname, rect, (quality or 1) * 100)
 end
+rawset(_G, 'snapshot', __tengine_snapshot)
 
-function getScreenSize()
+local function __tengine_getScreenSize()
     local size = screen_getSize()
     if size.width < size.height then
         return size.width, size.height
@@ -337,8 +376,9 @@ function getScreenSize()
         return size.height, size.width
     end
 end
+rawset(_G, 'getScreenSize', __tengine_getScreenSize)
 
-function setScreenScale(width, height, mode)
+local function __tengine_setScreenScale(width, height, mode)
     local floor = math.floor
     local screenSize = screen_getSize()
     -- 以前getScreenSize()返回值永远是短边为宽
@@ -363,37 +403,45 @@ function setScreenScale(width, height, mode)
         return rect
     end)
 end
+rawset(_G, 'setScreenScale', __tengine_setScreenScale)
 
-function resetScreenScale()
+local function __tengine_resetScreenScale()
     screen.reset()
 end
+rawset(_G, 'resetScreenScale', __tengine_resetScreenScale)
 
-function getScreenDPI()
+local function __tengine_getScreenDPI()
     return screen.getDPI()
 end
+rawset(_G, 'getScreenDPI', __tengine_getScreenDPI)
 
-function getScreenDirection()
+local function __tengine_getScreenDirection()
     return ori2dir(screen.getOrientation())
 end
+rawset(_G, 'getScreenDirection', __tengine_getScreenDirection)
 
-function binarizeImage(args)
+local function __tengine_binarizeImage(args)
     local img = screen.capture(block2rect(args.rect))
     return img:binarize(args.diff)
 end
+rawset(_G, 'binarizeImage', __tengine_binarizeImage)
 
-function touchDown(index, x, y)
+local function __tengine_touchDown(index, x, y)
     touch_down(index, x, y)
 end
+rawset(_G, 'touchDown', __tengine_touchDown)
 
-function touchMove(index, x, y)
+local function __tengine_touchMove(index, x, y)
     touch_move(index, x, y)
 end
+rawset(_G, 'touchMove', __tengine_touchMove)
 
-function touchUp(index, x, y)
+local function __tengine_touchUp(index, x, y)
     touch_up(index, x, y)
 end
+rawset(_G, 'touchUp', __tengine_touchUp)
 
-function catchTouchPoint(count, timeout)
+local function __tengine_catchTouchPoint(count, timeout)
     local count = count or 1
     local timeout = timeout or 60 * 1000
     local ret = touch.captureTap(count, timeout)
@@ -403,141 +451,174 @@ function catchTouchPoint(count, timeout)
         return ret
     end
 end
+rawset(_G, 'catchTouchPoint', __tengine_catchTouchPoint)
 
-function pressHomeKey()
+local function __tengine_pressHomeKey()
     touch.press(touch.KEY_HOME)
 end
+rawset(_G, 'pressHomeKey', __tengine_pressHomeKey)
 
-function doublePressHomeKey()
+local function __tengine_doublePressHomeKey()
     touch.doublePress(touch.KEY_HOME)
 end
+rawset(_G, 'doublePressHomeKey', __tengine_doublePressHomeKey)
 
-function pressKey(name, mode)
+local function __tengine_pressKey(name, mode)
     touch.press(keyname2code(name), mode)
     return 0
 end
+rawset(_G, 'pressKey', __tengine_pressKey)
 
-function showUI(json)
+local function __tengine_showUI(json)
     return legacy.showUI(json)
 end
+rawset(_G, 'showUI', __tengine_showUI)
 
-function resetUIConfig(file)
+local function __tengine_resetUIConfig(file)
     legacy.resetUIConfig(file)
 end
+rawset(_G, 'resetUIConfig', __tengine_resetUIConfig)
 
-function toast(msg)
+local function __tengine_toast(msg)
     UI.toast(tostring(msg))
 end
+rawset(_G, 'toast', __tengine_toast)
 
-function dialog(text, time)
+local function __tengine_dialog(text, time)
     legacy.dialog(tostring(text), time or 0)
 end
+rawset(_G, 'dialog', __tengine_dialog)
 
-function dialogRet(text, button1, button2, button3, time)
+local function __tengine_dialogRet(text, button1, button2, button3, time)
     return legacy.dialogRet(tostring(text), tostring(button1), tostring(button2), tostring(button3), time or 0)
 end
+rawset(_G, 'dialogRet', __tengine_dialogRet)
 
-function dialogInput(title, format, btn)
+local function __tengine_dialogInput(title, format, btn)
     return unpack(legacy.dialogInput(title, format, btn))
 end
+rawset(_G, 'dialogInput', __tengine_dialogInput)
 
-function setUIOrientation(mode)
+local function __tengine_setUIOrientation(mode)
     return legacy.setUIOrientation(mode)
 end
+rawset(_G, 'setUIOrientation', __tengine_setUIOrientation)
 
-function createHUD()
+local function __tengine_createHUD()
     return legacy.createHUD()
 end
+rawset(_G, 'createHUD', __tengine_createHUD)
 
-function showHUD(id, text, size, color, bg, pos, x, y, width, height)
+local function __tengine_showHUD(id, text, size, color, bg, pos, x, y, width, height)
     legacy.showHUD(id, tostring(text), size, color, bg, pos, x, y, width, height)
 end
+rawset(_G, 'showHUD', __tengine_showHUD)
 
-function hideHUD(id)
+local function __tengine_hideHUD(id)
     return legacy.hideHUD(id)
 end
+rawset(_G, 'hideHUD', __tengine_hideHUD)
 
-function inputText(content)
+local function __tengine_inputText(content)
     runtime.inputText(tostring(content))
 end
+rawset(_G, 'inputText', __tengine_inputText)
 
-function runApp(appID)
+local function __tengine_runApp(appID)
     return runtime.launchApp(appID) and 0 or -1
 end
+rawset(_G, 'runApp', __tengine_runApp)
 
-function closeApp(appID)
+local function __tengine_closeApp(appID)
     runtime.killApp(appID)
 end
+rawset(_G, 'closeApp', __tengine_closeApp)
 
-function appIsRunning(appID)
+local function __tengine_appIsRunning(appID)
     return runtime.isAppRunning(appID) and 1 or 0
 end
+rawset(_G, 'appIsRunning', __tengine_appIsRunning)
 
-function isFrontApp(appID)
+local function __tengine_isFrontApp(appID)
     return (runtime.getForegroundApp() == appID) and 1 or 0
 end
+rawset(_G, 'isFrontApp', __tengine_isFrontApp)
 
-function frontAppName()
+local function __tengine_frontAppName()
     return runtime.getForegroundApp()
 end
+rawset(_G, 'frontAppName', __tengine_frontAppName)
 
-function setWifiEnable(flag)
+local function __tengine_setWifiEnable(flag)
     return runtime.setWifiEnable(flag) and 1 or 0
 end
+rawset(_G, 'setWifiEnable', __tengine_setWifiEnable)
 
-function setAirplaneMode(flag)
+local function __tengine_setAirplaneMode(flag)
     return runtime.setAirplaneMode(flag) and 1 or 0
 end
+rawset(_G, 'setAirplaneMode', __tengine_setAirplaneMode)
 
-function setBTEnable(flag)
+local function __tengine_setBTEnable(flag)
     return runtime.setBTEnable(flag) and 1 or 0
 end
+rawset(_G, 'setBTEnable', __tengine_setBTEnable)
 
-function vibrator()
+local function __tengine_vibrator()
     runtime.vibrate(1000)
 end
+rawset(_G, 'vibrator', __tengine_vibrator)
 
-function playAudio(file)
+local function __tengine_playAudio(file)
     audio.play(file)
 end
+rawset(_G, 'playAudio', __tengine_playAudio)
 
-function stopAudio()
+local function __tengine_stopAudio()
     audio.stop()
 end
+rawset(_G, 'stopAudio', __tengine_stopAudio)
 
-function readPasteboard()
+local function __tengine_readPasteboard()
     return runtime.readClipboard()
 end
+rawset(_G, 'readPasteboard', __tengine_readPasteboard)
 
-function writePasteboard(content)
+local function __tengine_writePasteboard(content)
     runtime.writeClipboard(tostring(content))
 end
+rawset(_G, 'writePasteboard', __tengine_writePasteboard)
 
-function getLocalInfo()
+local function __tengine_getLocalInfo()
     return runtime.getLocalInfo()
 end
+rawset(_G, 'getLocalInfo', __tengine_getLocalInfo)
 
-function getSystemProperty(key)
+local function __tengine_getSystemProperty(key)
     local val = ''
     if xmod.PLATFORM == xmod.PLATFORM_ANDROID then
         val = runtime.android.getSystemProperty(key)
     end
     return val
 end
+rawset(_G, 'getSystemProperty', __tengine_getSystemProperty)
 
-function getDeviceIMEI()
+local function __tengine_getDeviceIMEI()
     return device.getIMEI()
 end
+rawset(_G, 'getDeviceIMEI', __tengine_getDeviceIMEI)
 
-function getDeviceIMSI()
+local function __tengine_getDeviceIMSI()
     return device.getIMSI()
 end
+rawset(_G, 'getDeviceIMSI', __tengine_getDeviceIMSI)
 
-function getDeviceUUID()
+local function __tengine_getDeviceUUID()
     return device.getUUID()
 end
+rawset(_G, 'getDeviceUUID', __tengine_getDeviceUUID)
 
-function getBatteryLevel()
+local function __tengine_getBatteryLevel()
     local isCharge, level = runtime.getBatteryInfo()
     local isChargeInt = 0
     if isCharge == true then
@@ -545,31 +626,37 @@ function getBatteryLevel()
     end
     return isChargeInt, level;
 end
+rawset(_G, 'getBatteryLevel', __tengine_getBatteryLevel)
 
-function lockDevice()
+local function __tengine_lockDevice()
     device.lock()
 end
+rawset(_G, 'lockDevice', __tengine_lockdevice)
 
-function unlockDevice()
+local function __tengine_unlockDevice()
     device.unlock()
 end
+rawset(_G, 'unlockDevice', __tengine_unlockdevice)
 
-function deviceIsLock()
+local function __tengine_deviceIsLock()
     return device.isLock() and 1 or 0
 end
+rawset(_G, 'deviceIsLock', __tengine_deviceIsLock)
 
-function resetIDLETimer()
+local function __tengine_resetIDLETimer()
     if xmod.PLATFORM == xmod.PLATFORM_IOS then
         runtime.ios.resetLockTimer()
     end
 end
+rawset(_G, 'resetIDLETimer', __tengine_resetIDLETimer)
 
-function createOcrDict(dict)
+local function __tengine_createOcrDict(dict)
     local dmocr = require('dmocr')
     return dmocr.create(dict)
 end
+rawset(_G, 'createOcrDict', __tengine_createOcrDict)
 
-function ocrText(instance, x1, y1, x2, y2, diffs, sim, flag, dir)
+local function __tengine_ocrText(instance, x1, y1, x2, y2, diffs, sim, flag, dir)
     local detail = flag == 1
     local result = instance:getText(block2rect({ x1, y1, x2, y2 }), diffs, sim, detail, dir)
     if detail then
@@ -581,6 +668,7 @@ function ocrText(instance, x1, y1, x2, y2, diffs, sim, flag, dir)
     end
     return result
 end
+rawset(_G, 'ocrText', __tengine_ocrText)
 
 local ocrSpy = {}
 function ocrSpy:new(ocr)
@@ -605,7 +693,7 @@ function ocrSpy:release()
     self.ocr:release()
 end
 
-function createOCR(config)
+local function __tengine_createOCR(config)
     local tessocr = require('tessocr_3.02.02')
     local ocr, msg = tessocr.create(config)
     if ocr ~= nil then
@@ -613,8 +701,9 @@ function createOCR(config)
     end
     return ocr, msg
 end
+rawset(_G, 'createOCR', __tengine_createOCR)
 
-function getProduct()
+local function __tengine_getProduct()
     local ret = 0
     local code = xmod.PRODUCT_CODE
     if code == xmod.PRODUCT_CODE_XXZS then
@@ -630,7 +719,9 @@ function getProduct()
     end
     return ret
 end
+rawset(_G, 'getProduct', __tengine_getProduct)
 
-function openUrl(url)
+local function __tengine_openUrl(url)
     runtime.openURL(url)
 end
+rawset(_G, 'openUrl', __tengine_openUrl)
