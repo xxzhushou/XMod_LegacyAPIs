@@ -631,12 +631,12 @@ rawset(_G, 'getBatteryLevel', __tengine_getBatteryLevel)
 local function __tengine_lockDevice()
     device.lock()
 end
-rawset(_G, 'lockDevice', __tengine_lockdevice)
+rawset(_G, 'lockDevice', __tengine_lockDevice)
 
 local function __tengine_unlockDevice()
     device.unlock()
 end
-rawset(_G, 'unlockDevice', __tengine_unlockdevice)
+rawset(_G, 'unlockDevice', __tengine_unlockDevice)
 
 local function __tengine_deviceIsLock()
     return device.isLock() and 1 or 0
