@@ -421,8 +421,12 @@ end
 rawset(_G, 'getScreenDirection', __tengine_getScreenDirection)
 
 local function __tengine_binarizeImage(args)
+    local ret = {}
     local img = screen.capture(block2rect(args.rect))
-    return img:binarize(args.diff)
+    if img then
+        ret = img:binarize(args.diff)
+    end
+    return ret
 end
 rawset(_G, 'binarizeImage', __tengine_binarizeImage)
 
@@ -720,6 +724,11 @@ local function __tengine_getProduct()
     return ret
 end
 rawset(_G, 'getProduct', __tengine_getProduct)
+
+local function __tengine_getRuntimeMode()
+    return xmod.PROCESS_MODE == xmod.PROCESS_MODE_STANDALONE and 2 or 0
+end
+rawset(_G, 'getRuntimeMode', __tengine_getRuntimeMode)
 
 local function __tengine_openUrl(url)
     runtime.openURL(url)
