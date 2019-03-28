@@ -5,9 +5,13 @@
 
 local bit = require('bit32')
 
--- 可能频繁调用的模块/函数, 用local加速下访问速度
+-- 可能频繁调用的模块/函数, 使用local加速访问速度
 local io = io
 local os = os
+local string = string
+local table = table
+local rawset = rawset
+
 local UI = UI
 local xmod = xmod
 local audio = audio
@@ -52,6 +56,79 @@ local storage_get = storage.get
 local storage_put = storage.put
 local storage_commit = storage.commit
 
+--[[ Lua 5.1 兼容 ]] --
+----------------------
+-- make unpack back
+rawset(_G, 'unpack', table.unpack)
+
+-- legacy support for string
+rawset(string, 'gfind', string.gmatch)
+
+-- legacy support for table
+rawset(table, 'foreach', function(t, f)
+    for k, v in pairs(t) do
+        f(k, v)
+    end
+end)
+
+rawset(table, 'foreachi', function(t, f)
+    for k, v in ipairs(t) do
+        f(k, v)
+    end
+end)
+
+rawset(table, 'getn', function(t)
+    if type(t.n) == 'number' then return t.n end
+    local max = 0
+    for i, _ in pairs(t) do
+        if type(i) == 'number' and i > max then
+            max = i
+        end
+    end
+    return max
+end)
+
+-- legacy support for io: 桥接[private]/[public]访问目录
+local __orig_io_open__ = io.open
+local function __hook_io_open(name, mode)
+    if type(name) == 'string' then
+        name = xmod_resolvePath(name)
+    end
+    return __orig_io_open__(name, mode)
+end
+rawset(io, 'open', __hook_io_open)
+
+local __orig_io_lines__ = io.lines
+local function __hook_io_lines(name)
+    if type(name) == 'string' then
+        name = xmod_resolvePath(name)
+    end
+    return __orig_io_lines__(name)
+end
+rawset(io, 'lines', __hook_io_lines)
+
+local __orig_io_input__ = io.input
+local function __hook_io_input(...)
+    local arg = { ... }
+    if #arg > 0 and type(arg[1]) == 'string' then
+        arg[1] = xmod_resolvePath(arg[1])
+    end
+    return __orig_io_input__(unpack(arg))
+end
+rawset(io, 'input', __hook_io_input)
+
+local __orig_io_output__ = io.output
+local function __hook_io_output(...)
+    local arg = { ... }
+    if #arg > 0 and type(arg[1]) == 'string' then
+        arg[1] = xmod_resolvePath(arg[1])
+    end
+    return __orig_io_output__(unpack(arg))
+end
+rawset(io, 'output', __hook_io_output)
+
+--[[ tengine 兼容 ]] --
+----------------------
 local function ori2dir(ori)
     local dir = 0
     if ori == screen.PROTRAIT_UPSIDEDOWN then
@@ -102,45 +179,6 @@ local function keyname2code(name)
     end
     return code
 end
-
--- (legacy) hook io函数，桥接[private]/[public]访问目录
-local __orig_io_open__ = io.open
-local function __hook_io_open(name, mode)
-    if type(name) == 'string' then
-        name = xmod_resolvePath(name)
-    end
-    return __orig_io_open__(name, mode)
-end
-rawset(io, 'open', __hook_io_open)
-
-local __orig_io_lines__ = io.lines
-local function __hook_io_lines(name)
-    if type(name) == 'string' then
-        name = xmod_resolvePath(name)
-    end
-    return __orig_io_lines__(name)
-end
-rawset(io, 'lines', __hook_io_lines)
-
-local __orig_io_input__ = io.input
-local function __hook_io_input(...)
-    local arg = { ... }
-    if #arg > 0 and type(arg[1]) == 'string' then
-        arg[1] = xmod_resolvePath(arg[1])
-    end
-    return __orig_io_input__(unpack(arg))
-end
-rawset(io, 'input', __hook_io_input)
-
-local __orig_io_output__ = io.output
-local function __hook_io_output(...)
-    local arg = { ... }
-    if #arg > 0 and type(arg[1]) == 'string' then
-        arg[1] = xmod_resolvePath(arg[1])
-    end
-    return __orig_io_output__(unpack(arg))
-end
-rawset(io, 'output', __hook_io_output)
 
 local function __tengine_sysLog(msg)
     log(msg)
