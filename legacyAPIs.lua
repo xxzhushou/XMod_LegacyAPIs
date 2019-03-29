@@ -152,7 +152,7 @@ local function dir2ori(dir)
 end
 
 local function block2rect(block)
-    return Rect(block[1], block[2], block[3] - block[1], block[4] - block[2])
+    return Rect(block[1], block[2], block[3] - block[1] + 1, block[4] - block[2] + 1)
 end
 
 local function searchdir2priority(hdir, vdir, priority)
