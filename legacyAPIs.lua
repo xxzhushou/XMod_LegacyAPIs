@@ -631,10 +631,11 @@ local function __tengine_writePasteboard(content)
 end
 rawset(_G, 'writePasteboard', __tengine_writePasteboard)
 
-local function __tengine_getLocalInfo()
-    return runtime.getLocalInfo()
+local function __tengine_getLocaleInfo()
+    return runtime.getLocaleInfo()
 end
-rawset(_G, 'getLocalInfo', __tengine_getLocalInfo)
+rawset(_G, 'getLocaleInfo', __tengine_getLocaleInfo)
+rawset(_G, 'getLocalInfo', __tengine_getLocaleInfo) -- typo
 
 local function __tengine_getSystemProperty(key)
     local val = ''
@@ -646,17 +647,29 @@ end
 rawset(_G, 'getSystemProperty', __tengine_getSystemProperty)
 
 local function __tengine_getDeviceIMEI()
-    return device.getIMEI()
+    local val = ''
+    if xmod.PLATFORM == xmod.PLATFORM_ANDROID then
+        val = device.android.getIMEI()
+    end
+    return val
 end
 rawset(_G, 'getDeviceIMEI', __tengine_getDeviceIMEI)
 
 local function __tengine_getDeviceIMSI()
-    return device.getIMSI()
+    local val = ''
+    if xmod.PLATFORM == xmod.PLATFORM_ANDROID then
+        val = device.android.getIMSI()
+    end
+    return val
 end
 rawset(_G, 'getDeviceIMSI', __tengine_getDeviceIMSI)
 
 local function __tengine_getDeviceUUID()
-    return device.getUUID()
+    local val = ''
+    if xmod.PLATFORM == xmod.PLATFORM_ANDROID then
+        val = device.ios.getUUID()
+    end
+    return val
 end
 rawset(_G, 'getDeviceUUID', __tengine_getDeviceUUID)
 
@@ -671,17 +684,21 @@ end
 rawset(_G, 'getBatteryLevel', __tengine_getBatteryLevel)
 
 local function __tengine_lockDevice()
-    device.lock()
+    if xmod.PLATFORM == xmod.PLATFORM_IOS then
+        runtime.ios.lockScreen()
+    end
 end
 rawset(_G, 'lockDevice', __tengine_lockDevice)
 
 local function __tengine_unlockDevice()
-    device.unlock()
+    if xmod.PLATFORM == xmod.PLATFORM_IOS then
+        runtime.ios.unlockScreen()
+    end
 end
 rawset(_G, 'unlockDevice', __tengine_unlockDevice)
 
 local function __tengine_deviceIsLock()
-    return device.isLock() and 1 or 0
+    return runtime.isScreenLocked() and 1 or 0
 end
 rawset(_G, 'deviceIsLock', __tengine_deviceIsLock)
 
