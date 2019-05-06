@@ -5,7 +5,7 @@
 
 local bit = require('bit32')
 
--- 可能频繁调用的模块/函数, 使用local加速访问速度
+-- 频繁调用的模块/函数, 使用local加速访问速度
 local io = io
 local os = os
 local string = string
@@ -88,7 +88,7 @@ rawset(table, 'getn', function(t)
     return max
 end)
 
--- legacy support for io: 桥接[private]/[public]访问目录
+-- [[ io/os模块桥接[private]/[public]访问目录 ]] --
 local __orig_io_open__ = io.open
 local function __hook_io_open(name, mode)
     if type(name) == 'string' then
@@ -127,7 +127,16 @@ local function __hook_io_output(...)
 end
 rawset(io, 'output', __hook_io_output)
 
---[[ tengine 兼容 ]] --
+local __orig_os_remove__ = os.remove
+local function __hook_os_remove(name)
+    if type(name) == 'string' then
+        name = xmod_resolvePath(name)
+    end
+    return __orig_os_remove__(name)
+end
+rawset(os, 'remove', __hook_os_remove)
+
+--[[ TEngine 1.9.x API兼容 ]] --
 ----------------------
 local function ori2dir(ori)
     local dir = 0
