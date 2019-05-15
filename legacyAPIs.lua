@@ -675,8 +675,8 @@ rawset(_G, 'getDeviceIMSI', __tengine_getDeviceIMSI)
 
 local function __tengine_getDeviceUUID()
     local val = ''
-    if xmod.PLATFORM == xmod.PLATFORM_ANDROID then
-        val = device.android.getUUID()
+    if xmod.PLATFORM == xmod.PLATFORM_IOS then
+        val = device.ios.getUUID()
     end
     return val
 end
