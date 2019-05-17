@@ -492,12 +492,34 @@ local function __tengine_touchUp(index, x, y)
 end
 rawset(_G, 'touchUp', __tengine_touchUp)
 
-local function __tengine_catchTouchPoint(count, timeout)
+local function __tengine_catchTouchPoint(count, timeout, isFllowInit)
     local count = count or 1
     local timeout = timeout or 60 * 1000
     local ret = touch.captureTap(count, timeout)
+
     if count == 1 then
-        return ret.x, ret.y
+        ret = {ret}
+    end
+
+    if not isFllowInit then
+        local screenSize = screen.getSize()
+        local deviceWidth = math.min(screenSize.width, screenSize.height)
+        local deviceHeight = math.max(screenSize.width, screenSize.height)
+        local initOri = xmod.getConfig(xmod.EXPECTED_ORIENTATION, screen.PORTRAIT)
+    
+        if initOri == screen.LANDSCAPE_RIGHT then
+            for index, point in ipairs(ret) do
+                ret[index] = Point(deviceWidth-point.y-1, point.x)
+            end
+        elseif initOri == screen.LANDSCAPE_LEFT  then
+            for index, point in ipairs(ret) do
+                ret[index] = Point(point.y, deviceHeight-point.x-1)
+            end
+        end
+    end
+
+    if count == 1 then
+        return ret[1].x, ret[1].y
     else
         return ret
     end
