@@ -161,7 +161,11 @@ local function dir2ori(dir)
 end
 
 local function block2rect(block)
-    return Rect(block[1], block[2], block[3] - block[1] + 1, block[4] - block[2] + 1)
+    local x1 = math.min(block[1], block[3])
+    local y1 = math.min(block[2], block[4])
+    local x2 = math.max(block[1], block[3])
+    local y2 = math.max(block[2], block[4])
+    return Rect(x1, y1, x2 - x1 + 1, y2 - y1 + 1)
 end
 
 local function searchdir2priority(hdir, vdir, priority)
@@ -245,8 +249,8 @@ end
 rawset(_G, 'lua_restart', __tengine_lua_restart)
 
 local function __tengine_setSysConfig(key, value)
-    if key == screen.SCREENCAP_POLICY then
-        value = (value == 'aggressive') and screen.SCREENCAP_POLICY_AGGRESSIVE or screen.SCREENCAP_POLICY_STANDARD
+    if key == xmod.SCREENCAP_POLICY then
+        value = (value == 'aggressive') and xmod.SCREENCAP_POLICY_AGGRESSIVE or xmod.SCREENCAP_POLICY_STANDARD
     end
     xmod_setConfig(key, value)
 end
