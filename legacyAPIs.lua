@@ -161,10 +161,10 @@ local function dir2ori(dir)
 end
 
 local function block2rect(block)
-    local x1 = math.min(block[1], block[3])
-    local y1 = math.min(block[2], block[4])
-    local x2 = math.max(block[1], block[3])
-    local y2 = math.max(block[2], block[4])
+    local x1 = math.min(tonumber(block[1]), tonumber(block[3]))
+    local y1 = math.min(tonumber(block[2]), tonumber(block[4]))
+    local x2 = math.max(tonumber(block[1]), tonumber(block[3]))
+    local y2 = math.max(tonumber(block[2]), tonumber(block[4]))
     return Rect(x1, y1, x2 - x1 + 1, y2 - y1 + 1)
 end
 
@@ -228,7 +228,8 @@ end
 rawset(_G, 'getOSType', __tengine_getOSType)
 
 local function __tengine_getEngineVersion()
-    return xmod.VERSION_NAME
+    -- remove 'r' or 'd' suffix
+    return string.sub(xmod.VERSION_NAME, 1, #xmod.VERSION_NAME - 1)
 end
 rawset(_G, 'getEngineVersion', __tengine_getEngineVersion)
 
@@ -331,7 +332,7 @@ end
 rawset(_G, 'init', __tengine_init)
 
 local function __tengine_findImageInRegionFuzzy(picpath, degree, x1, y1, x2, y2, alpha)
-    local pos = screen_findImage(block2rect({ x1, y1, x2, y2 }), picpath, degree, screen.PRIORITY_DEFAULT, alpha)
+    local pos = screen_findImage(block2rect({ x1, y1, x2, y2 }), picpath, tonumber(degree), screen.PRIORITY_DEFAULT, alpha)
     return pos.x, pos.y
 end
 rawset(_G, 'findImageInRegionFuzzy', __tengine_findImageInRegionFuzzy)
@@ -344,7 +345,7 @@ local function __tengine_findColor(block, color, degree, hdir, vdir, priority)
         end
         color = ct
     end
-    local pos = screen_findColor(block2rect(block), color, degree, searchdir2priority(hdir or 0, vdir or 0, priority or 0))
+    local pos = screen_findColor(block2rect(block), color, tonumber(degree), searchdir2priority(hdir or 0, vdir or 0, priority or 0))
     return pos.x, pos.y
 end
 rawset(_G, 'findColor', __tengine_findColor)
@@ -357,7 +358,7 @@ local function __tengine_findColors(block, color, degree, hdir, vdir, priority)
         end
         color = ct
     end
-    local points = screen_findColors(block2rect(block), color, degree, searchdir2priority(hdir or 0, vdir or 0, priority or 0), 199)
+    local points = screen_findColors(block2rect(block), color, tonumber(degree), searchdir2priority(hdir or 0, vdir or 0, priority or 0), 199)
     local result = {}
     for _, p in ipairs(points) do
         table.insert(result, { x = p.x, y = p.y })
@@ -367,31 +368,31 @@ end
 rawset(_G, 'findColors', __tengine_findColors)
 
 local function __tengine_findColorInRegionFuzzy(tcolor, degree, x1, y1, x2, y2, hdir, vdir)
-    return __tengine_findColor({ x1, y1, x2, y2 }, tcolor, degree, hdir or 0, vdir or 0)
+    return __tengine_findColor({ x1, y1, x2, y2 }, tcolor, tonumber(degree), hdir or 0, vdir or 0)
 end
 rawset(_G, 'findColorInRegionFuzzy', __tengine_findColorInRegionFuzzy)
 
 local function __tengine_findMultiColorInRegionFuzzy(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
     local color = string.format('0|0|0x%06x,%s', tcolor, posandcolors)
-    return __tengine_findColor({ x1, y1, x2, y2 }, color, degree, hdir or 0, vdir or 0)
+    return __tengine_findColor({ x1, y1, x2, y2 }, color, tonumber(degree), hdir or 0, vdir or 0)
 end
 rawset(_G, 'findMultiColorInRegionFuzzy', __tengine_findMultiColorInRegionFuzzy)
 
 local function __tengine_findMultiColorInRegionFuzzy2(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
     table.insert(posandcolors, 1, { x = 0, y = 0, color = tcolor })
-    return __tengine_findColor({ x1, y1, x2, y2 }, posandcolors, degree, hdir or 0, vdir or 0)
+    return __tengine_findColor({ x1, y1, x2, y2 }, posandcolors, tonumber(degree), hdir or 0, vdir or 0)
 end
 rawset(_G, 'findMultiColorInRegionFuzzy2', __tengine_findMultiColorInRegionFuzzy2)
 
 local function __tengine_findMultiColorInRegionFuzzyExt(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
     local color = string.format('0|0|0x%06x,%s', tcolor, posandcolors)
-    return __tengine_findColors({ x1, y1, x2, y2 }, color, degree, hdir or 0, vdir or 0)
+    return __tengine_findColors({ x1, y1, x2, y2 }, color, tonumber(degree), hdir or 0, vdir or 0)
 end
 rawset(_G, 'findMultiColorInRegionFuzzyExt', __tengine_findMultiColorInRegionFuzzyExt)
 
 local function __tengine_findMultiColorInRegionFuzzyExt2(tcolor, posandcolors, degree, x1, y1, x2, y2, hdir, vdir)
     table.insert(posandcolors, 1, { x = 0, y = 0, color = tcolor })
-    return __tengine_findColors({ x1, y1, x2, y2 }, posandcolors, degree, hdir or 0, vdir or 0)
+    return __tengine_findColors({ x1, y1, x2, y2 }, posandcolors, tonumber(degree), hdir or 0, vdir or 0)
 end
 rawset(_G, 'findMultiColorInRegionFuzzyExt2', __tengine_findMultiColorInRegionFuzzyExt2)
 
