@@ -432,6 +432,7 @@ rawset(_G, 'getScreenSize', __tengine_getScreenSize)
 
 local function __tengine_setScreenScale(width, height, mode)
     local floor = math.floor
+    local ceil = math.ceil
     local screenSize = screen_getSize()
     -- 以前getScreenSize()返回值永远是短边为宽
     -- 因此setScreenScale传入参数也是setScreenScale(短边, 长边)的形式
@@ -450,8 +451,8 @@ local function __tengine_setScreenScale(width, height, mode)
         end
         rect.x = floor(rect.x * sw)
         rect.y = floor(rect.y * sh)
-        rect.width = floor(rect.width * sw)
-        rect.height = floor(rect.height * sh)
+        rect.width = ceil(rect.width * sw)
+        rect.height = ceil(rect.height * sh)
         return rect
     end)
 end
